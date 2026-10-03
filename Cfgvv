@@ -1,0 +1,135 @@
+--// SKYBOX + MAP TEXTURE + KILL SOUND
+
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+
+--// SKYBOX
+local skyData = {
+    SkyboxBk = "rbxassetid://7658055825",
+    SkyboxDn = "rbxassetid://7658055825",
+    SkyboxFt = "rbxassetid://7658055825",
+    SkyboxLf = "rbxassetid://7658055825",
+    SkyboxRt = "rbxassetid://7658055825",
+    SkyboxUp = "rbxassetid://7658055825"
+}
+
+--// MAP TEXTURE REPLACEMENT
+--// 7658055825 -> 6372755229
+
+local OLD_ID = "7658055825"
+local NEW_ID = "6372755229"
+
+local function isOldTexture(textureId)
+    if not textureId then
+        return false
+    end
+
+    return string.find(textureId, OLD_ID, 1, true) ~= nil
+end
+
+for _, object in ipairs(workspace:GetDescendants()) do
+    if object:IsA("Texture") then
+        if isOldTexture(object.Texture) then
+            object.Texture = "rbxassetid://" .. NEW_ID
+        end
+
+    elseif object:IsA("Decal") then
+        if isOldTexture(object.Texture) then
+            object.Texture = "rbxassetid://" .. NEW_ID
+        end
+
+    elseif object:IsA("SurfaceAppearance") then
+        if isOldTexture(object.ColorMap) then
+            object.ColorMap = "rbxassetid://" .. NEW_ID
+        end
+    end
+end
+
+print("Texture replacement complete: " .. OLD_ID .. " -> " .. NEW_ID)
+
+--// APPLY SKYBOX
+local function applySkybox()
+    local sky = Lighting:FindFirstChildOfClass("Sky")
+
+    if not sky then
+        sky = Instance.new("Sky")
+        sky.Parent = Lighting
+    end
+
+    for property, value in pairs(skyData) do
+        sky[property] = value
+    end
+end
+
+applySkybox()
+
+--// KEEP SKYBOX ACTIVE
+Lighting.ChildRemoved:Connect(function(child)
+    if child:IsA("Sky") then
+        task.wait()
+        applySkybox()
+    end
+end)
+
+Lighting.ChildAdded:Connect(function(child)
+    if child:IsA("Sky") then
+        task.wait()
+        applySkybox()
+    end
+end)
+
+--// SATA ANDAGI KILL SOUND
+--// Works for players AND NPC dummies
+
+local SOUND_ID = "rbxassetid://135097031120155"
+
+local function playKillSound()
+    local sound = Instance.new("Sound")
+    sound.Name = "SataAndagiKillSound"
+    sound.SoundId = SOUND_ID
+    sound.Volume = 1
+    sound.Parent = SoundService
+    sound:Play()
+
+    sound.Ended:Once(function()
+        sound:Destroy()
+    end)
+end
+
+local watched = {}
+
+local function watchCharacter(character)
+    if watched[character] then
+        return
+    end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+    if not humanoid then
+        return
+    end
+
+    watched[character] = true
+
+    humanoid.Died:Connect(function()
+        playKillSound()
+    end)
+end
+
+--// Watch existing players and NPC dummies
+for _, object in ipairs(workspace:GetDescendants()) do
+    if object:IsA("Model") and object:FindFirstChildOfClass("Humanoid") then
+        watchCharacter(object)
+    end
+end
+
+--// Watch newly spawned players and NPC dummies
+workspace.DescendantAdded:Connect(function(object)
+    if object:IsA("Humanoid") then
+        local character = object.Parent
+
+        if character and character:IsA("Model") then
+            watchCharacter(character)
+        end
+    end
+end)
